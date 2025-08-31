@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Eldrin the Wizard - AI Voice Chat</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(to right, #8360c3, #2ebf91);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    .container {
+      width: 100%;
+      max-width: 500px;
+      height: 90vh;
+      background: #ffffff;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+      border-radius: 15px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    h2 {
+      text-align: center;
+      margin: 15px 0 0;
+      font-weight: 600;
+      font-size: 20px;
+      background: linear-gradient(to right, #6dd5ed, #2193b0);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    #chatbox {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background: #fdfdfd;
+    }
+
+    .message {
+      padding: 12px 18px;
+      border-radius: 18px;
+      max-width: 75%;
+      word-wrap: break-word;
+      font-size: 15px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+      line-height: 1.4;
+    }
+
+    .user {
+      background-color: #d6eaff;
+      align-self: flex-end;
+    }
+
+    .bot {
+      background-color: #e2f4e2;
+      align-self: flex-start;
+    }
+
+    #inputArea {
+      display: flex;
+      padding: 15px;
+      border-top: 1px solid #ddd;
+      background: #f0f2f5;
+      gap: 10px;
+    }
+
+    #inputText {
+      flex: 1;
+      padding: 10px 15px;
+      font-size: 16px;
+      border-radius: 20px;
+      border: 1px solid #ccc;
+      outline: none;
+    }
+
+    #sendBtn, #micBtn, #clearBtn {
+      padding: 10px 16px;
+      font-size: 16px;
+      background: #6f42c1;
+      color: white;
+      border: none;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    #sendBtn:hover, #micBtn:hover, #clearBtn:hover {
+      background: #5a32a3;
+    }
+
+    #micBtn.listening {
+      background: #28a745;
+    }
+    /* Config Section */
+    #configSection {
+      padding: 12px;
+      border-top: 1px solid #ddd;
+      background: #fafafa;
+      font-size: 14px;
+    }
+    #configSection label {
+      display: block;
+      margin-bottom: 4px;
+      font-weight: 500;
+    }
+    #configSection input {
+      width: 100%;
+      padding: 6px 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      margin-bottom: 8px;
+    }
+    #configSection button {
+      padding: 6px 12px;
+      font-size: 14px;
+      background: #2ebf91;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    #configSection button:hover {
+      background: #249f78;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h2>🧙 Eldrin the Wizard - AI Voice Chat</h2>
+
+  <div id="chatbox"></div>
+
+  <div id="inputArea">
+    <input type="text" id="inputText" placeholder="Speak or type, noble traveler..." />
+    <button id="sendBtn">Send</button>
+    <button id="micBtn">🎤</button>
+    <button id="clearBtn">🗑️</button>
+  </div>
+
+  <!-- Config Panel -->
+  <div id="configSection">
+    <label for="weatherApiKey">🌦️ OpenWeather API Key:</label>
+    <input type="text" id="weatherApiKey" placeholder="Enter your API key"/>
+    <button onclick="saveApiKey()">Save Key</button>
+  </div>
+    <!-- Footer -->
+  <div style="text-align:center; padding: 8px; font-size: 12px; color: #777; border-top: 1px solid #eee;">
+    ⚡ Powered by Eldrin the Wizard & Murf AI
+  </div>
+
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const chatbox = document.getElementById("chatbox");
+    const inputText = document.getElementById("inputText");
+    const sendBtn = document.getElementById("sendBtn");
+    const micBtn = document.getElementById("micBtn");
+    const clearBtn = document.getElementById("clearBtn");
+
+    // ========== CHAT HELPERS ==========
+    function addMessage(text, sender) {
+      const msg = document.createElement("div");
+      msg.className = `message ${sender}`;
+      msg.textContent = text;
+      chatbox.appendChild(msg);
+      chatbox.scrollTop = chatbox.scrollHeight;
+    }
+
+    // ========== CONFIG STORAGE ==========
+    window.saveApiKey = function() {
+      const key = document.getElementById("weatherApiKey").value.trim();
+      if (key) {
+        localStorage.setItem("weatherApiKey", key);
+        addMessage("🔑 API Key saved successfully!", "bot");
+      }
+    }
+    function getApiKey() {
+      return localStorage.getItem("weatherApiKey") || "";
+    }
+    // Load saved API key if exists
+    document.getElementById("weatherApiKey").value = getApiKey();
+
+    // ========== AI RESPONSE ==========
+    async function getAIResponse(userMessage) {
+      const lower = userMessage.toLowerCase();
+
+      // 🌦️ Weather
+      if (lower.includes("weather")) {
+        const cityMatch = userMessage.match(/weather in (.+)/i);
+        const city = cityMatch ? cityMatch[1].trim() : "Hyderabad";
+        const apiKey = getApiKey();
+
+        if (!apiKey) {
+          return "You must set your 🌦️ OpenWeather API Key below before I can fetch the weather.";
+        }
+
+        try {
+          const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${apiKey}&units=metric`;
+          const response = await fetch(url);
+          const data = await response.json();
+
+          if (data.cod === 200) {
+            return `The weather in ${data.name} is ${data.weather[0].description}, with a temperature of ${data.main.temp}°C.`;
+          } else {
+            return `Alas, I could not find the weather for "${city}". (Reason: ${data.message})`;
+          }
+        } catch (err) {
+          return "The winds of the internet are blocked. I cannot fetch the weather.";
+        }
+      }
+
+      // 📚 Wikipedia
+      if (lower.startsWith("tell me about")) {
+        const topic = userMessage.replace(/tell me about/i, "").trim();
+        if (!topic) return "You must name the subject, traveler!";
+
+        try {
+          const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(topic)}`;
+          const response = await fetch(url);
+          const data = await response.json();
+
+          if (data.extract) {
+            return `Ah, here’s what I know about ${data.title}: ${data.extract}`;
+          } else {
+            return `Alas, I found no scrolls about "${topic}".`;
+          }
+        } catch (err) {
+          return "The mystical scrolls of knowledge are hidden from me at the moment.";
+        }
+      }
+
+      // 🧙 Default responses
+      const responseMap = {
+        "hello": "Greetings, traveler! How may I assist you on this mystical day?",
+        "how are you": "As well as any ancient wizard can be, thank you!",
+        "what's your name": "I am Eldrin, the wise wizard of the code realm.",
+        "who made you": "I was conjured into existence by the spellcaster Karnati Sravanthi.",
+        "what is your developer name": "The brilliant mage Karnati Sravanthi, of course.",
+        "bye": "Fare thee well, noble friend!",
+        "thank you": "Your gratitude is received with honor and light.",
+        "what can you do": "I can offer wisdom, summon weather forecasts, and share knowledge from the scrolls of Wikipedia!"
+      };
+
+      return responseMap[lower] || "Alas, I do not comprehend that. Try asking about the weather or say 'Tell me about AI'.";
+    }
+
+    // ========== SPEAK ==========
+    function speak(text) {
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.lang = "en-US";
+      utter.rate = 0.9;
+      utter.pitch = 0.7;
+
+      const voices = speechSynthesis.getVoices();
+      utter.voice = voices.find(v => v.name.includes("Daniel") || v.name.includes("Google UK English Male")) || voices[0];
+
+      speechSynthesis.speak(utter);
+    }
+    // ========== PROCESS ==========
+    async function processMessage(message) {
+      addMessage(message, "user");
+      inputText.value = "";
+      const aiResponse = await getAIResponse(message);
+      addMessage(aiResponse, "bot");
+      speak(aiResponse);
+    }
+
+    // ========== EVENTS ==========
+    sendBtn.onclick = async () => {
+      const userMessage = inputText.value.trim();
+      if (!userMessage) return;
+      await processMessage(userMessage);
+    };
+
+    inputText.addEventListener("keypress", function(e) {
+      if (e.key === "Enter") sendBtn.click();
+    });
+
+    clearBtn.onclick = () => {
+      chatbox.innerHTML = "";
+    };
+    // 🎤 Voice input
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.lang = "en-US";
+      recognition.interimResults = false;
+
+      micBtn.onclick = () => {
+        recognition.start();
+        micBtn.classList.add("listening");
+        micBtn.textContent = "🎙️ Listening...";
+      };
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript.trim();
+        micBtn.classList.remove("listening");
+        micBtn.textContent = "🎤";
+        if (transcript) {
+          processMessage(transcript);
+        }
+      };
+
+      recognition.onerror = (event) => {
+        micBtn.classList.remove("listening");
+        micBtn.textContent = "🎤";
+        addMessage("⚠️ Voice recognition error: " + event.error, "bot");
+      };
+
+      recognition.onend = () => {
+        micBtn.classList.remove("listening");
+        micBtn.textContent = "🎤";
+      };
+    } else {
+      micBtn.disabled = true;
+      micBtn.title = "Voice recognition not supported in this browser";
+    }
+  });
+</script>
+</body>
+</html>
+
